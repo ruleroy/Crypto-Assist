@@ -1,30 +1,44 @@
+import warnings
+warnings.filterwarnings("ignore") 
+
 import time
 import sys, getopt
-import datetime
+from datetime import datetime, timedelta
 import pandas as pd
 import scipy.stats
 
-from sklearn import linear_model
+import random
+
+from sklearn import linear_model, preprocessing, model_selection
 from sklearn.model_selection import train_test_split
+from sklearn.ensemble import RandomForestRegressor
 import statsmodels.api as sm
 
 import matplotlib.pyplot as plt
 import matplotlib.dates as mdates
 import matplotlib.ticker as mticker
 from matplotlib.finance import candlestick_ohlc
+
 from matplotlib import style
 
 import numpy as np
 import talib
 from talib.abstract import *
 
+import predict
+import test
+import trade
+
 style.use('ggplot')
 
 from binance.client import Client
+
 key_file = open("key.txt", "r")
 lines = key_file.readlines()
 lines[0] = lines[0].strip().split(':')
 lines[1] = lines[1].strip().split(':')
+
+
 
 if(not lines[0][1] or not lines[1][1]):
     print('API_KEY or SECRET in key.txt is empty')
@@ -36,7 +50,7 @@ api_secret = lines[1][1]
 client = Client(api_key, api_secret)
 
 try:
-    account = client.get_account()
+    client.ping()
 except:
     print("Connection Error")
     print("Please check your API_KEY and SECRET in key.txt and make sure it is correct.")
@@ -46,6 +60,11 @@ print("Connection Success")
 
 def printLastMarketPrices():
     prices = client.get_all_tickers()
+    marketsymbols = []
+    for symbol in prices:
+        if symbol['symbol'][-3:] == 'BTC':
+            marketsymbols.append(symbol['symbol'])
+
     print('Last Market Prices')
     for price in prices:
         print(price['symbol'] + ': ' + price['price'])
@@ -66,11 +85,17 @@ def printCurrentAssetBalance(pair):
     
 def help():
     print('bot.py')
-    print('     -p <period>     Delay to loop update in seconds')
-    print('     -k <asset>      Klines')
-    print('     -c <asset>      Check asset balance')
-    print('     -b              Show current asset balances')
-    print('     -l              Last market prices')
+    print('     -e                              Current exchange rate limits')
+    print('     -p <period>                     Delay to loop update in seconds')
+    print('     -k <asset>                      Klines')
+    print('     -c <asset>                      Check asset balance')
+    print('     -w                              Show current asset balances')
+    print('     -l                              Last market prices')
+    print('     -f                              Forecast market prices')
+    print('     -t                              Test method')
+    print('     -b <asset_price_qty>            Buy order')
+    print('     -s <asset_price_qty>            Sell order')
+    print('     -x <asset>                      Cancel all orders for pair')
 
 def candlestick_ohlc_black(*args,**kwargs):
     lines, patches = candlestick_ohlc(*args,**kwargs)
@@ -80,152 +105,6 @@ def candlestick_ohlc_black(*args,**kwargs):
         patch.set_antialiased(False)
         line.set_color("k")
         line.set_zorder(0)
-
-def linearRegressionModel(pair):
-    candles = client.get_klines(symbol=pair, interval=Client.KLINE_INTERVAL_4HOUR)
-    date, closep, highp, lowp, openp, volume = [], [], [], [], [], []
-    ts_format = []
-
-    for candle in candles:
-        dt_ts = datetime.datetime.fromtimestamp(int(candle[0]) / 1e3 )
-        #print(dt_ts)
-        ts_format.append(mdates.date2num(dt_ts))
-        date.append(int(candle[0]))
-        openp.append(float(candle[1]))
-        highp.append(float(candle[2]))
-        lowp.append(float(candle[3]))
-        closep.append(float(candle[4]))
-        volume.append(float(candle[5]))
-    
-    inputs = {
-        'open': np.array(openp),
-        'high': np.array(highp),
-        'low': np.array(lowp),
-        'close': np.array(closep),
-        'volume': np.array(volume)
-    }
-
-    output = SMA(inputs, timeperiod=25)
-    slowk, slowd = STOCH(inputs, 5, 3, 0, 3, 0)
-    real = RSI(inputs, timeperiod=14)
-    macd, macdsignal, macdhist = MACD(inputs, fastperiod=12, slowperiod=26, signalperiod=9)
-
-    data = {
-        'date': np.array(ts_format[50:]),
-        'open': np.array(openp[50:]),
-        'high': np.array(highp[50:]),
-        'low': np.array(lowp[50:]),
-        'close': np.array(closep[50:]),
-        'volume': np.array(volume[50:]),
-        'rsi': np.array(real[50:]),
-        'macd': np.array(macd[50:]),
-        'macdsignal': np.array(macdsignal[50:]),
-        'macdhist': np.array(macdhist[50:]),
-        'sma': np.array(output[50:])
-    }
-
-    #print(output[25:])
-    #print(closep[25:])
-
-    #linear regression model
-    #future = datetime.datetime(2018, 4, 10)
-    #print(future)
-    #future = mdates.date2num(future)
-
-    df = pd.DataFrame.from_dict(data)
-    X = df[['date', 'rsi', 'macd', 'sma']].values
-    Y = df['close'].values
-
-    index = df['date'].values
-    index = index[-50:]
-
-    pred_x = X
-    pred_x = pred_x[-50:]
-    pred_y = df['close'].values
-    pred_y = pred_y[-50:]
-    #pred_x = df['close']
-
-    pearR = scipy.stats.pearsonr(df['close'], df['date'])
-    print(f"\nPearson Correlation: {pearR}")
-    if pearR[1] < 0.05: 
-        print("p-value is less than 5%, correlation between x and y is significant")
-    else:
-        print("p-value is greater than or equal to 5%, correlation between x and y is insignificant")
-
-
-    #training set
-    X_train, X_test, Y_train, Y_test = train_test_split(X, Y, test_size=0.2)
-    #print(f'{X_train.shape} , {y_train.shape}')
-    #print(f'{X_test.shape} , {y_test.shape}')
-
-    lm = linear_model.LinearRegression()
-    model = lm.fit(X_train, Y_train)
-    #print(X[0:500])
-    predictions = lm.predict(pred_x)
-
-    #to_predict = X[X[50,0]+1]
-    #predictions2 = lm.predict(to_predict)
-    #print(predictions2)
-
-    print("\nAccuracy Score: ")
-    accuracy = lm.score(pred_x, pred_y) * 100
-    accuracy = '{:,.2f}'.format(accuracy)
-    print(lm.score(pred_x, pred_y))
-    print("\nsklearn predictions: ")
-    print(predictions[-5:])
-    print("\nTrue values: ")
-    #print(y_test[-5:])
-    print(pred_y[-5:])
-
-    ax = plt.subplot2grid((1,1), (0,0))
-    ax.plot(index, predictions, '--', label=f'Prediction ({accuracy}% accuracy)')
-    ax.plot(index, pred_y, label='True value')
-
-    #print(index.values)
-    #ax.xaxis.set_ticks(np.arange(min(index), max(index)+1, 1.0))
-    ax.xaxis.set_major_formatter(mdates.DateFormatter("%Y-%m-%d %H:%M"))
-
-    #plt.plot(predictions, '--', color='#EB3737', linewidth=2, label='Prediction')
-    #plt.plot(pred_y, label='True', color='green')
-    #plt.plot(predictions, '--', color='#EB3737', linewidth=2, label='Prediction')
-    #plt.plot(Y_test, label='True', color='green', linewidth=2)
-    plt.legend()
-    #plt.plot(df['date'], df['close'])
-    #plt.plot(df['date'], predictions)
-    
-    plt.title("BTC to USD - Model Accuracy")
-
-    #plt.scatter(y_test, predictions)
-    #plt.xlabel("True Values")
-    #plt.ylabel("Predictions")
-    
-    #X = ts_format[25:100]
-    #Y = closep[25:100]
-
-    #test_data = ts_format[-74:]
-    #test_data.append(future)
-
-    #print(mdates.num2date(test_data[-1]))
-
-    #linearModel = linear_model.LinearRegression()
-    #model = linearModel.fit([X], [Y])
-    #predictions = model.predict([test_data])
-
-    #print("\nAccuracy Score: ")
-    #print(linearModel.score([X], [Y]))
-    #print("\nsklearn predictions: ")
-    #print(predictions[:,-2:])
-
-    #print(Y[-2:])
-
-    #ax1 = plt.subplot2grid((1,1), (0,0))
-    #ax1.xaxis.set_major_formatter(mdates.DateFormatter('%Y-%m-%d %H:%M:%S'))
-    #ax1.set_title(pair)
-    #ax1.grid(True)
-    #ax1.scatter(real[25:], closep[25:])
-    plt.show()
-
-
     
 def printKlines(pair):
     candles = client.get_klines(symbol=pair, interval=Client.KLINE_INTERVAL_4HOUR)
@@ -236,7 +115,7 @@ def printKlines(pair):
 
     for candle in candles:
         #timestamp = time.strftime("%a %d %b %Y %H:%M:%S GMT", time.gmtime(candle[0] / 1000.0))
-        dt_ts = datetime.datetime.fromtimestamp(int(candle[0]) / 1e3 )
+        dt_ts = datetime.fromtimestamp(int(candle[0]) / 1e3 )
         ts_format.append(mdates.date2num(dt_ts))
         timestamp = time.strftime("%b %d %H:%M", time.gmtime(candle[0] / 1000.0))
         gmt_time.append(timestamp)
@@ -316,9 +195,14 @@ def main(argv):
     linearPair = ''
     checkLastPrice = False
     showCurrentBalance = False
+    forecast = False
+    testSymbol = ''
+    buyParams = ''
+    sellParams = ''
+    cancelParams = ''
 
     try:
-        opts, args = getopt.getopt(argv,"blhp:c:k:m:",["period=", "asset=", "klines=", "model="])
+        opts, args = getopt.getopt(argv,"efwlhp:c:k:m:t:b:s:x:",["period=", "asset=", "klines=", "model=", "test=", "buy=", "sell=", "cancel="])
     except getopt.GetoptError:
         help()
         sys.exit(2)
@@ -332,15 +216,53 @@ def main(argv):
             help()
         elif opt == '-l':
             checkLastPrice = True
-        elif opt == '-b':
+        elif opt == '-w':
             showCurrentBalance = True
         elif opt in ("-k", "--klines"):
             kpair = arg
         elif opt in ("-m", "--model"):
             linearPair = arg
-
+        elif opt == '-f':
+            forecast = True
+        elif opt == '-e':
+            exchange_info = client.get_exchange_info()
+            rate_limits = exchange_info['rateLimits']
+            for r in rate_limits:
+                print(f"{r['rateLimitType']} per {r['interval']}: {r['limit']}")
+        elif opt in ("-t", "--test"):
+            testSymbol = arg
+        elif opt in ("-b", "--buy"):
+            buyParams = arg
+        elif opt in ("-s", "--sell"):
+            sellParams = arg
+        elif opt in ("-x", "--cancel"):
+            cancelParams = arg
+            
 
     while True:
+        if(cancelParams):
+            trade.cancelAllOrders(client, cancelParams)
+
+        if(sellParams):
+            params_arr = sellParams.split("_")
+            print(params_arr)
+            trade.sellOrder(client, params_arr[0], params_arr[1], params_arr[2])
+
+        if(buyParams):
+            params_arr = buyParams.split("_")
+            print(params_arr)
+            trade.buyOrder(client, params_arr[0], params_arr[1], params_arr[2])
+
+        if(testSymbol):
+            print('\n')
+            t0 = time.time()
+            candles = client.get_klines(symbol=testSymbol, interval=Client.KLINE_INTERVAL_15MINUTE)
+            depth = client.get_order_book(symbol=testSymbol, limit=100)
+            test.testMethod(testSymbol, candles, depth)
+            t1 = time.time()
+            total = t1-t0
+            print(total)
+
         if(checkLastPrice):
             printLastMarketPrices()
         
@@ -350,8 +272,17 @@ def main(argv):
         if(kpair):
             printKlines(kpair)
 
-        if(linearPair):
-            linearRegressionModel(linearPair)
+        if(forecast):
+            prices = client.get_all_tickers()
+            marketsymbols = []
+            for symbol in prices:
+                if symbol['symbol'][-3:] == 'BTC':
+                    marketsymbols.append(symbol['symbol'])
+        
+            for symbol in marketsymbols:
+                candles = client.get_klines(symbol=symbol, interval=Client.KLINE_INTERVAL_15MINUTE)
+                depth = client.get_order_book(symbol=symbol)
+                predict.linearRegressionModel(symbol, candles, depth)
 
         if(pair):
             printCurrentAssetBalance(pair)
