@@ -45,8 +45,11 @@ def linearRegressionModel(pair, candles, depth):
 
     output = SMA(inputs, timeperiod=25)
     slowk, slowd = STOCH(inputs, 5, 3, 0, 3, 0)
-    real = RSI(inputs, timeperiod=14)
+    real = RSI(inputs, timeperiod=7)
     macd, macdsignal, macdhist = MACD(inputs, fastperiod=12, slowperiod=26, signalperiod=9)
+    print(real[-1])
+    plt.plot(real)
+    plt.show()
 
     data = {
         'date': np.array(ts_format[50:]),
@@ -131,9 +134,9 @@ def linearRegressionModel(pair, candles, depth):
     increase = forecast - float(lowest_ask)
     increase = (increase / float(lowest_ask)) * 100
     
-    if increase >= 0.5:
-        print(f'\n{pair}')
-        print(f'Lowest Ask: {lowest_ask}')
-        print(f'Last close price: {close}')
-        print(f'Forecasted price: {forecast}')
-        print(f'% change: {increase}')
+    #if increase >= 0.5:
+    print(f'\n{pair}')
+    print(f'Lowest Ask: {lowest_ask}')
+    print(f'Last close price: {close}')
+    print(f'Forecasted price: {forecast}')
+    print(f'% change: {increase}')

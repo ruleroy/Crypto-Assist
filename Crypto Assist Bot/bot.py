@@ -28,6 +28,7 @@ from talib.abstract import *
 import predict
 import test
 import trade
+import backtest
 
 style.use('ggplot')
 
@@ -85,17 +86,18 @@ def printCurrentAssetBalance(pair):
     
 def help():
     print('bot.py')
-    print('     -e                              Current exchange rate limits')
-    print('     -p <period>                     Delay to loop update in seconds')
-    print('     -k <asset>                      Klines')
-    print('     -c <asset>                      Check asset balance')
-    print('     -w                              Show current asset balances')
-    print('     -l                              Last market prices')
-    print('     -f                              Forecast market prices')
-    print('     -t                              Test method')
-    print('     -b <asset_price_qty>            Buy order')
-    print('     -s <asset_price_qty>            Sell order')
-    print('     -x <asset>                      Cancel all orders for pair')
+    print('     -e                                      Current exchange rate limits')
+    print('     -p <period>                             Delay to loop update in seconds')
+    print('     -k <asset>                              Klines')
+    print('     -c <asset>                              Check asset balance')
+    print('     -w                                      Show current asset balances')
+    print('     -l                                      Last market prices')
+    print('     -f                                      Forecast market prices')
+    print('     -t                                      Test method')
+    print('     -b <asset_price_qty>                    Buy order')
+    print('     -s <asset_price_qty>                    Sell order')
+    print('     -x <asset>                              Cancel all orders for pair')
+    print('     -r <asset_bal crypto_bal usd>           Run backtest')
 
 def candlestick_ohlc_black(*args,**kwargs):
     lines, patches = candlestick_ohlc(*args,**kwargs)
@@ -107,7 +109,7 @@ def candlestick_ohlc_black(*args,**kwargs):
         line.set_zorder(0)
     
 def printKlines(pair):
-    candles = client.get_klines(symbol=pair, interval=Client.KLINE_INTERVAL_4HOUR)
+    candles = client.get_klines(symbol=pair, interval=Client.KLINE_INTERVAL_30MINUTE)
     #print(candles)
     date, closep, highp, lowp, openp, volume = [], [], [], [], [], []
     gmt_time = []
@@ -144,7 +146,9 @@ def printKlines(pair):
 
     output = SMA(inputs, timeperiod=25)
     slowk, slowd = STOCH(inputs, 5, 3, 0, 3, 0)
-    real = RSI(inputs, timeperiod=14)
+    real = RSI(inputs, timeperiod=7)
+    print(real[-1])
+
 
     macd, macdsignal, macdhist = MACD(inputs, fastperiod=12, slowperiod=26, signalperiod=9)
     #print(real)
@@ -200,9 +204,11 @@ def main(argv):
     buyParams = ''
     sellParams = ''
     cancelParams = ''
+    predictPair = ''
+    backtestParams = ''
 
     try:
-        opts, args = getopt.getopt(argv,"efwlhp:c:k:m:t:b:s:x:",["period=", "asset=", "klines=", "model=", "test=", "buy=", "sell=", "cancel="])
+        opts, args = getopt.getopt(argv,"efwlhp:c:k:m:t:b:s:x:a:r:",["period=", "asset=", "klines=", "model=", "test=", "buy=", "sell=", "cancel=", "predict=", "btest="])
     except getopt.GetoptError:
         help()
         sys.exit(2)
@@ -237,9 +243,18 @@ def main(argv):
             sellParams = arg
         elif opt in ("-x", "--cancel"):
             cancelParams = arg
+        elif opt in ("-a", "--predict"):
+            predictPair = arg
+        elif opt in ("-r", "--btest"):
+            backtestParams = arg
             
 
     while True:
+        if(backtestParams):
+            params_arr = backtestParams.split("_")
+            bt = backtest.backtest(client, params_arr[0], params_arr[1], params_arr[2])
+            bt.testModel()
+
         if(cancelParams):
             trade.cancelAllOrders(client, cancelParams)
 
@@ -254,14 +269,49 @@ def main(argv):
             trade.buyOrder(client, params_arr[0], params_arr[1], params_arr[2])
 
         if(testSymbol):
-            print('\n')
+            print(datetime.now())
             t0 = time.time()
-            candles = client.get_klines(symbol=testSymbol, interval=Client.KLINE_INTERVAL_15MINUTE)
-            depth = client.get_order_book(symbol=testSymbol, limit=100)
-            test.testMethod(testSymbol, candles, depth)
+            if(testSymbol == 'ALL') or (testSymbol == 'all'):
+                filename1 = datetime.now().strftime("%Y%m%d-%H%M%S")
+                #open('output.txt', 'w').close()
+                sys.stdout = open(f'output/{filename1}.txt', 'w')
+
+                print(datetime.now())
+                prices = client.get_all_tickers()
+                marketsymbols = []
+                ta = []
+                for symbol in prices:
+                    if symbol['symbol'][-3:] == 'BTC':
+                        marketsymbols.append(symbol['symbol'])
+        
+                for symbol in marketsymbols:
+                    ta.append(test.testMethod(client, symbol, True))
+
+                print("Stoch K lower than 20")
+                for t in ta:
+                    if(t['slowk'] <= 20):
+                        test.printOutputs(t)
+
+                print("\n-------------------------------")
+                print("Stoch K lower than D")
+                for t in ta:
+                    if(t['slowk'] <= 80 and t['slowk'] <= t['slowd']):
+                        if(t['macd'] <= t['macdsignal']):
+                            test.printOutputs(t)
+                print('\n')
+                sys.stdout.close()
+                sys.stdout = sys.__stdout__
+                print(f'Results displayed in output/{filename1}.txt')
+            else:
+                t0 = time.time()
+                test.printOutputs(test.testMethod(client, testSymbol, False))
+                t1 = time.time()
+                total = t1-t0
+                #print(total)
             t1 = time.time()
             total = t1-t0
-            print(total)
+            print(f"Finished in: {total}")
+            
 
         if(checkLastPrice):
             printLastMarketPrices()
@@ -280,9 +330,14 @@ def main(argv):
                     marketsymbols.append(symbol['symbol'])
         
             for symbol in marketsymbols:
-                candles = client.get_klines(symbol=symbol, interval=Client.KLINE_INTERVAL_15MINUTE)
+                candles = client.get_klines(symbol=symbol, interval=Client.KLINE_INTERVAL_5MINUTE)
                 depth = client.get_order_book(symbol=symbol)
                 predict.linearRegressionModel(symbol, candles, depth)
+
+        if(predictPair):
+            candles = client.get_klines(symbol=predictPair, interval=Client.KLINE_INTERVAL_4HOUR, limit=100)
+            depth = client.get_order_book(symbol=predictPair)
+            predict.linearRegressionModel(predictPair, candles, depth)
 
         if(pair):
             printCurrentAssetBalance(pair)
