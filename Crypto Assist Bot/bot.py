@@ -110,6 +110,8 @@ def candlestick_ohlc_black(*args,**kwargs):
     
 def printKlines(pair):
     candles = client.get_klines(symbol=pair, interval=Client.KLINE_INTERVAL_30MINUTE)
+    candles2 = client.get_klines(symbol='BTCUSDT', interval=Client.KLINE_INTERVAL_30MINUTE)
+    #print(candles2)
     #print(candles)
     date, closep, highp, lowp, openp, volume = [], [], [], [], [], []
     gmt_time = []
@@ -144,11 +146,40 @@ def printKlines(pair):
         'volume': np.array(volume)
     }
 
+    date2, closep2, highp2, lowp2, openp2, volume2, ts_format2, gmt_time2 = [], [], [], [], [], [], [], []
+
+    for candle in candles2:
+        dt_ts2 = datetime.fromtimestamp(int(candle[0]) / 1e3 )
+        ts_format2.append(mdates.date2num(dt_ts2))
+        timestamp2 = time.strftime("%b %d %H:%M", time.gmtime(candle[0] / 1000.0))
+        gmt_time2.append(timestamp2)
+        date2.append(int(candle[0]))
+        openp2.append(float(candle[1]))
+        highp2.append(float(candle[2]))
+        lowp2.append(float(candle[3]))
+        closep2.append(float(candle[4]))
+        volume2.append(float(candle[5]))
+
+    x2 = 0
+    y2 = len(date2)
+    ohlc2 = []
+    while x2 < y2:
+        append_me2 = ts_format2[x2], openp2[x2], highp2[x2], lowp2[x2], closep2[x2], volume2[x2]
+        ohlc2.append(append_me2)
+        x2 += 1
+
+    inputs2 = {
+        'open': np.array(openp2),
+        'high': np.array(highp2),
+        'low': np.array(lowp2),
+        'close': np.array(closep2),
+        'volume': np.array(volume2)
+    }
+
+
     output = SMA(inputs, timeperiod=25)
     slowk, slowd = STOCH(inputs, 5, 3, 0, 3, 0)
     real = RSI(inputs, timeperiod=7)
-    print(real[-1])
-
 
     macd, macdsignal, macdhist = MACD(inputs, fastperiod=12, slowperiod=26, signalperiod=9)
     #print(real)
@@ -163,6 +194,9 @@ def printKlines(pair):
     plt.xticks(rotation=25)
     plt.margins(0)
     
+    ax1.scatter(closep, closep2)
+    print(f'PearsonR: {scipy.stats.pearsonr(closep2, closep)}')
+    '''
     candlestick_ohlc(ax1, ohlc, width=0.1, colorup='#77d879', colordown='#db3f3f')
     #candlestick_ohlc_black(ax1, ohlc, width=1)
     #ax1.plot(date, closep)
@@ -188,7 +222,7 @@ def printKlines(pair):
     ax3.plot(ts_format, real)
     ax3.xaxis.set_major_formatter(xfmt)
     ax3.set_title('RSI')
-
+    '''
     plt.show()
 
     
@@ -287,17 +321,21 @@ def main(argv):
                 for symbol in marketsymbols:
                     ta.append(test.testMethod(client, symbol, True))
 
+                ta = filter(None, ta)
                 print("Stoch K lower than 20")
                 for t in ta:
                     if(t['slowk'] <= 20):
-                        test.printOutputs(t)
+                        if(t['macd'] <= t['macdsignal']):
+                            if(t['price'] <= t['middleband']):
+                                test.printOutputs(t)
 
                 print("\n-------------------------------")
                 print("Stoch K lower than D")
                 for t in ta:
                     if(t['slowk'] <= 80 and t['slowk'] <= t['slowd']):
                         if(t['macd'] <= t['macdsignal']):
-                            test.printOutputs(t)
+                            if(t['price'] <= t['middleband']):
+                                test.printOutputs(t)
                 print('\n')
                 sys.stdout.close()
                 sys.stdout = sys.__stdout__

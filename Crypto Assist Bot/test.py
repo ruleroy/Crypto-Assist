@@ -19,9 +19,11 @@ from pyti.stochrsi import stochrsi
 
 
 def testMethod(client, pair, filter):
-
-    candles = client.get_klines(symbol=pair, interval=Client.KLINE_INTERVAL_4HOUR, limit=100)
-    depth = client.get_order_book(symbol=pair, limit=100)
+    try:
+        candles = client.get_klines(symbol=pair, interval=Client.KLINE_INTERVAL_4HOUR)
+        depth = client.get_order_book(symbol=pair)
+    except:
+        return
 
     date, closep, highp, lowp, openp, volume = [], [], [], [], [], []
     ts_format = []
@@ -46,9 +48,10 @@ def testMethod(client, pair, filter):
 
     #sma = SMA(inputs, timeperiod=14)
     slowk, slowd = STOCH(inputs, 5, 3, 0, 3, 0)
-    real = RSI(inputs, timeperiod=14)
+    rsi = RSI(inputs, timeperiod=7)
     macd, macdsignal, macdhist = MACD(inputs, fastperiod=12, slowperiod=26, signalperiod=9)
     fastk, fastd = STOCHRSI(inputs, timeperiod=14, fastk_period=3, fastd_period=3, fastd_matype=0)
+    upperband, middleband, lowerband = BBANDS(inputs, timeperiod=5, nbdevup=2, nbdevdn=2, matype=0)
     
     lowest_bid = depth['bids'][0][0]
     lowest_ask = depth['asks'][0][0]
@@ -81,20 +84,18 @@ def testMethod(client, pair, filter):
         print(f"Weighted mid price: {weighted_spread}")
         #print(f"Limit order imbalance: {order_imbalance}")
         print("\n")
-    '''
-    if filter:
-        if (slowk[-1] <= 20) or (slowk[-1] <= slowd[-1] and slowk[-1] <= 80):
-            printOutput()
-    else:
-        printOutput()
-    '''
+
     output = {
         'symbol': pair,
         'price': lowest_ask,
         'slowk': slowk[-1],
         'slowd': slowd[-1],
         'macd': '{0:.8f}'.format(macd[-1]),
-        'macdsignal': '{0:.8f}'.format(macdsignal[-1])
+        'macdsignal': '{0:.8f}'.format(macdsignal[-1]),
+        'upperband': '{0:.8f}'.format(upperband[-1]),
+        'middleband': '{0:.8f}'.format(middleband[-1]),
+        'lowerband': '{0:.8f}'.format(lowerband[-1]),
+        'rsi': rsi[-1]
     }
     return output
 
@@ -175,13 +176,10 @@ def testMethod(client, pair, filter):
     plt.show()
     '''
 def printOutputs(ta):
-    f = open('output.txt', 'w')
-    f.write(f"\n{ta['symbol']}")
-    f.write(f"Stoch    K: {ta['slowk']}   D: {ta['slowd']}")
-    f.write(f"Macd     macd: {ta['macd']}  Signal: {ta['macdsignal']}")
-    f.write(f"Last ask price: {ta['price']}")
 
     print(f"\n{ta['symbol']}")
-    print(f"Stoch    K: {ta['slowk']}   D: {ta['slowd']}")
-    print(f"Macd     macd: {ta['macd']}  Signal: {ta['macdsignal']}")
+    print(f"RSI: {ta['rsi']}")
+    print(f"STOCH    K: {ta['slowk']}   D: {ta['slowd']}")
+    print(f"MACD     MACD: {ta['macd']}  SIGNAL: {ta['macdsignal']}")
+    print(f"BBANDS   Upper: {ta['upperband']}   Middle: {ta['middleband']}   Lower: {ta['lowerband']}")
     print(f"Last ask price: {ta['price']}")
