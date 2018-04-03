@@ -38,6 +38,7 @@ def testMethod(client, pair, filter):
         closep.append(float(candle[4]))
         volume.append(float(candle[5]))
     
+    closep2 = [i * 10000 for i in closep]
     inputs = {
         'open': np.array(openp),
         'high': np.array(highp),
@@ -46,12 +47,23 @@ def testMethod(client, pair, filter):
         'volume': np.array(volume)
     }
 
+    inputs2 = {
+        'open': np.array(openp),
+        'high': np.array(highp),
+        'low': np.array(lowp),
+        'close': np.array(closep2),
+        'volume': np.array(volume)
+    }
+
     #sma = SMA(inputs, timeperiod=14)
     slowk, slowd = STOCH(inputs, 5, 3, 0, 3, 0)
-    rsi = RSI(inputs, timeperiod=7)
+    rsi = RSI(inputs, timeperiod=14)
     macd, macdsignal, macdhist = MACD(inputs, fastperiod=12, slowperiod=26, signalperiod=9)
     fastk, fastd = STOCHRSI(inputs, timeperiod=14, fastk_period=3, fastd_period=3, fastd_matype=0)
-    upperband, middleband, lowerband = BBANDS(inputs, timeperiod=5, nbdevup=2, nbdevdn=2, matype=0)
+    upperband, middleband, lowerband = BBANDS(inputs2, timeperiod=5, nbdevup=2, nbdevdn=2, matype=0)
+    upperband = [b / 10000 for b in upperband]
+    middleband = [b / 10000 for b in middleband]
+    lowerband = [b / 10000 for b in lowerband]
     
     lowest_bid = depth['bids'][0][0]
     lowest_ask = depth['asks'][0][0]
