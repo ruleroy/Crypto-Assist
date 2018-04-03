@@ -321,7 +321,7 @@ def main(argv):
                 for symbol in marketsymbols:
                     ta.append(test.testMethod(client, symbol, True))
 
-                ta = filter(None, ta)
+                ta = list(filter(None.__ne__, ta))
                 print("Stoch K lower than 20")
                 for t in ta:
                     if(t['slowk'] <= 20):
@@ -331,12 +331,13 @@ def main(argv):
 
                 print("\n-------------------------------")
                 print("Stoch K lower than D")
+
                 for t in ta:
                     if(t['slowk'] <= 80 and t['slowk'] <= t['slowd']):
                         if(t['macd'] <= t['macdsignal']):
                             if(t['price'] <= t['middleband']):
                                 test.printOutputs(t)
-                print('\n')
+
                 sys.stdout.close()
                 sys.stdout = sys.__stdout__
                 print(f'Results displayed in output/{filename1}.txt')
