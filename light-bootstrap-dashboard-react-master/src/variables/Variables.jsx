@@ -496,19 +496,19 @@ var dataSales = {
   ]
 };
 var optionsSales = {
-  low: 0,
-  high: 800,
+  low: 6000,
+  high: 8000,
   showArea: false,
   height: "245px",
   axisX: {
-    showGrid: false,
+    showGrid: true,
   },
   lineSmooth: true,
   showLine: true,
   showPoint: true,
-  fullWidth: true,
+  fullWidth: false,
   chartPadding: {
-    right: 50
+    right: 100
   }
 };
 var responsiveSales = [
