@@ -3,8 +3,8 @@ import { NavLink } from 'react-router-dom';
 
 import HeaderLinks from '../Header/HeaderLinks.jsx';
 
-import imagine from 'assets/img/sidebar-3.jpg';
-import logo from 'assets/img/reactlogo.png';
+import imagine from 'assets/img/sidebar.jpg';
+import logo from 'assets/img/ca.png';
 
 import appRoutes from 'routes/app.jsx';
 
@@ -33,14 +33,14 @@ class Sidebar extends Component{
             <div id="sidebar" className="sidebar" data-color="black" data-image={imagine}>
                 <div className="sidebar-background" style={sidebarBackground}></div>
                     <div className="logo">
-                        <a href="https://www.creative-tim.com" className="simple-text logo-mini">
+                        <a href="#" className="simple-text logo-mini">
                             <div className="logo-img">
                                 <img src={logo} alt="logo_image"/>
                             </div>
 
                         </a>
-                        <a href="https://www.creative-tim.com" className="simple-text logo-normal">
-                            Creative Tim
+                        <a href="#" className="simple-text logo-normal">
+                            Crypto Assist
                         </a>
                     </div>
                 <div className="sidebar-wrapper">
@@ -50,7 +50,7 @@ class Sidebar extends Component{
                             appRoutes.map((prop,key) => {
                                 if(!prop.redirect)
                                     return (
-                                        <li className={prop.upgrade ? "active active-pro":this.activeRoute(prop.path)} key={key}>
+                                        <li key={key}>
                                             <NavLink to={prop.path} className="nav-link" activeClassName="active">
                                                 <i className={prop.icon}></i>
                                                 <p>{prop.name}</p>

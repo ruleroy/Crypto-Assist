@@ -10,7 +10,7 @@ export class UserCard extends Component{
                 </div>
                 <div className="content">
                     <div className="author">
-                         <a href="#pablo">
+                         <a href="#">
                             <img className="avatar border-gray" src={this.props.avatar} alt="..."/>
                             <h4 className="title">
                                 {this.props.name}

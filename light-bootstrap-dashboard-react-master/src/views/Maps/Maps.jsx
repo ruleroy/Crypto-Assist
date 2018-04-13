@@ -3,6 +3,9 @@ import {Map, Marker, GoogleApiWrapper} from 'google-maps-react';
 
 
 class Maps extends Component{
+    componentDidMount(){
+    document.title = "Crypto Assist - Maps";
+}
     render() {
         return (
             <div id="map">

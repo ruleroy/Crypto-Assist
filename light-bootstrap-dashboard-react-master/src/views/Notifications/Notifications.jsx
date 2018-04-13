@@ -4,6 +4,9 @@ import { Grid, Row, Col, Alert } from 'react-bootstrap';
 import Button from 'elements/CustomButton/CustomButton.jsx';
 
 class Notifications extends Component {
+    componentDidMount(){
+    document.title = "Crypto Assist - Notifications";
+}
     render() {
         return (
             <div className="content">
