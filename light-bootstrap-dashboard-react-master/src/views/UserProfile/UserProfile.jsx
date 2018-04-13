@@ -12,10 +12,6 @@ import Button from 'elements/CustomButton/CustomButton.jsx';
 import avatar from "assets/img/faces/face-3.jpg";
 
 class UserProfile extends Component {
-componentDidMount(){
-    document.title = "Crypto Assist - User Profile";
-}
-
     render() {
         return (
             <div className="content">

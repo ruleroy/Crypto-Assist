@@ -4,9 +4,6 @@ import { Grid, Row, Col } from 'react-bootstrap';
 import Card from 'components/Card/Card.jsx'
 
 class Typography extends Component {
-componentDidMount(){
-    document.title = "Crypto Assist - Typography";
-}
     render() {
         return (
             <div className="content">

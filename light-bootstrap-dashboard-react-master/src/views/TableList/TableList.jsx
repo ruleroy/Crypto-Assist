@@ -5,9 +5,7 @@ import Card from 'components/Card/Card.jsx';
 import {thArray, tdArray} from 'variables/Variables.jsx';
 
 class TableList extends Component {
-componentDidMount(){
-    document.title = "Crypto Assist - Table List";
-}
+
     render() {
         return (
             <div className="content">
