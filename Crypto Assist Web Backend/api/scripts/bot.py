@@ -6,18 +6,23 @@ import sys, getopt
 from datetime import datetime, timedelta
 import pandas as pd
 import scipy.stats
+from sklearn.preprocessing import StandardScaler
+from sklearn.preprocessing import Normalizer
 
 import random
+import os, errno
 
 from sklearn import linear_model, preprocessing, model_selection
 from sklearn.model_selection import train_test_split
 from sklearn.ensemble import RandomForestRegressor
 import statsmodels.api as sm
+import statsmodels.formula.api as smf
 
 import matplotlib.pyplot as plt
 import matplotlib.dates as mdates
 import matplotlib.ticker as mticker
 from matplotlib.finance import candlestick_ohlc
+import seaborn as sns
 
 from matplotlib import style
 
@@ -30,6 +35,7 @@ import test
 import trade
 import backtest
 import json
+import requests
 
 style.use('ggplot')
 
@@ -157,16 +163,269 @@ def returnCandles(pair):
     }
     data_str = json.dumps(inputs)
     print(data_str)
+
+def analyzePair(pair):
+    formattedPair = pair
+    if(pair == 'BTC'):
+        formattedPair += 'USDT'
+    else:
+        if(pair == 'BCH'):
+            formattedPair = 'BCC'
+        if(pair == 'MIOTA'):
+            formattedPair = 'IOTA'
+        formattedPair += 'BTC'
     
-def printKlines(pair):
-    candles = client.get_klines(symbol=pair, interval=Client.KLINE_INTERVAL_30MINUTE)
-    candles2 = client.get_klines(symbol='BTCUSDT', interval=Client.KLINE_INTERVAL_30MINUTE)
+    candles = client.get_klines(symbol=formattedPair, interval=Client.KLINE_INTERVAL_4HOUR, limit=500)
+    btcCandles = client.get_klines(symbol='BTCUSDT', interval=Client.KLINE_INTERVAL_4HOUR, limit=500)
+    
+    close, date, volume, gmt_time = [], [], [], []
+    for c in candles:
+        dt_ts = datetime.fromtimestamp(int(c[0]) / 1e3 )
+        date.append(mdates.date2num(dt_ts))
+        timestamp = time.strftime("%b %d %H:%M", time.gmtime(c[0] / 1000.0))
+        gmt_time.append(timestamp)
+        if(formattedPair == "BTCUSDT"):
+            close.append(int("{0:.0f}".format(round(float(c[4]),2))))
+        else:
+            close.append(float(c[4]))
+        volume.append(float(c[5]))
+    
+    bclose, bdate, bvolume, bgmt_time = [], [], [], []
+    for c in btcCandles:
+        dt_ts = datetime.fromtimestamp(int(c[0]) / 1e3 )
+        bdate.append(mdates.date2num(dt_ts))
+        timestamp = time.strftime("%b %d %H:%M", time.gmtime(c[0] / 1000.0))
+        bgmt_time.append(timestamp)
+        if(formattedPair == "BTCUSDT"):
+            bclose.append(int("{0:.0f}".format(round(float(c[4]),2))))
+        else:
+            bclose.append(float(c[4]))
+        bvolume.append(float(c[5]))
+
+    Y = close[-100:]
+    Y_total = [c for c in close]
+    X = [i for i in range(100)]
+    X_total = [i for i in range(len(close))]
+    Y = np.array(Y)
+    X = np.array(X)
+    Y_total = np.array(Y_total)
+    X_total = np.array(X_total)
+    vol = np.array(volume)
+
+    bprice = np.array(bclose)
+
+    names = ['date', 'volume', 'price', 'btc_price']
+    data = pd.DataFrame({'date':X_total, 'volume': vol, 'price':Y_total, 'btc_price':bprice})
+    normalized = Normalizer().fit_transform(data)
+    df_normalized = pd.DataFrame(normalized, columns=names)
+
+    X2 = np.array(data)
+    X2 = preprocessing.scale(X2)
+    y2 = np.array(data['price'])
+    forecast_out = 30
+    X_train = X2[:-2 * forecast_out]
+    y_train = y2[forecast_out:-forecast_out]
+    X_train, X_test, y_train, y_test = train_test_split(X_train, y_train, test_size=0.2)
+
+    clf = linear_model.LinearRegression()
+    clf.fit(X_train, y_train)
+    accuracy = clf.score(X_test, y_test)
+    print(float("{0:.2f}".format(round(float(accuracy*100),2))))
+
+    # predict last 30 days
+    X_eval30 = X2[-2 * forecast_out:-forecast_out]
+    y_eval_forecast = clf.predict(X_eval30)
+
+    data['prediction'] = np.nan
+    data['prediction'][-forecast_out:] = y_eval_forecast
+    
+    # predict 30 days into future
+    X_pred30 = X2[-forecast_out:]
+    y_pred_forecast = clf.predict(X_pred30)
+
+    last_date = data['date'].iloc[-1]
+    dt = last_date
+
+    #print(data)
+
+    for i in y_pred_forecast:
+        dt += 1
+        data.loc[dt] = [np.nan for _ in range(len(data.columns) - 1)] + [i]
+    
+    #print(data[-forecast_out:])
+
+    fig, ax = plt.subplots(1,1)
+
+    fit = np.polyfit(X, Y, deg=1)
+    plt.title("BTC price in past 100 4 hr candles")
+    plt.scatter(X, Y, color='blue')
+    plt.plot(X, fit[0] * X + fit[1])
+    
+    linearY = []
+    for i in range(len(Y)):
+        linear = fit[0] * X[i] + fit[1]
+        #linear = int("{0:.8f}".format(round(float(linear),2)))
+        linearY.append(linear)
+
+    data.hist("price")
+    #plt.margins(0.1)
+    #plt.locator_params(nbins=10)
+    
+    #z = np.polyfit(x,y,1)
+    #z = np.polyfit(x, y, 1)
+    #p = np.poly1d(z)
+    #ax.plot(date,p(date),"r--")
+
+    displayArr = []
+    for i in range(len(Y)):
+        obj = {
+            'time': float(X[i]),
+            'price': float(Y[i]),
+            'linearY': float("{0:.8f}".format(round(float(linearY[i]),8)))
+        }
+        displayArr.append(obj)
+    for i in range(len(Y_total)):
+        obj = {
+            'rtime': float(X_total[i]),
+            'rprice': float(Y_total[i])
+        }
+        displayArr.append(obj)
+    for i in range(len(data) - forecast_out, len(data)):
+        obj = {
+            'ptime': float(i),
+            'prediction': float("{0:.8f}".format(round(float(data.iloc[i]['prediction']),8)))
+        }
+        displayArr.append(obj)
+    data_str = json.dumps(displayArr)
+    print(data_str)
+    
+    #plt.show()
+
+    
+def printKlines(email):
+    api_url_base = 'https://api.coinmarketcap.com/v2/ticker/?limit=10'
+    headers = {'Content-Type': 'application/json'}
+
+    response = requests.get(api_url_base, headers=headers)
+
+    jsonData = {}
+
+    if response.status_code == 200:
+        jsonData = json.loads(response.content.decode('utf-8'))
+    else:
+        sys.exit()
+    
+    top10 = []
+
+    for coin in jsonData['data']:
+        if (jsonData['data'][coin]['symbol'] == "BCH"):
+            top10.append("BCC")
+        elif (jsonData['data'][coin]['symbol'] == "MIOTA"):
+            top10.append("IOTA")
+        else:
+            top10.append(jsonData['data'][coin]['symbol'])
+
+    print(top10)
+    pair = []
+    for t in top10:
+        if(t == "BTC"):
+            pair.append(t + "USDT")
+        else:
+            pair.append(t + "BTC")
+
+    print(pair)
+
+    candles = {}
+    i = 0
+    for t in top10:
+        candles[t] = client.get_klines(symbol=pair[i], interval=Client.KLINE_INTERVAL_4HOUR, limit=100)
+        i += 1
+
+    #candles = client.get_klines(symbol=pair, interval=Client.KLINE_INTERVAL_30MINUTE)
+    '''
+    candles = {
+        'BTC': client.get_klines(symbol='BTCUSDT', interval=Client.KLINE_INTERVAL_4HOUR, limit=100),
+        'ETH': client.get_klines(symbol='ETHBTC', interval=Client.KLINE_INTERVAL_4HOUR, limit = 100),
+        'XRP': client.get_klines(symbol='XRPBTC', interval=Client.KLINE_INTERVAL_4HOUR, limit = 100),
+        'BCC': client.get_klines(symbol='BCCBTC', interval=Client.KLINE_INTERVAL_4HOUR, limit = 100),
+        'EOS': client.get_klines(symbol='EOSBTC', interval=Client.KLINE_INTERVAL_4HOUR, limit = 100),
+        'ADA': client.get_klines(symbol='ADABTC', interval=Client.KLINE_INTERVAL_4HOUR, limit = 100),
+        'LTC': client.get_klines(symbol='LTCBTC', interval=Client.KLINE_INTERVAL_4HOUR, limit = 100),
+        'XLM': client.get_klines(symbol='XLMBTC', interval=Client.KLINE_INTERVAL_4HOUR, limit = 100),
+        'TRX': client.get_klines(symbol='TRXBTC', interval=Client.KLINE_INTERVAL_4HOUR, limit = 100),
+        'NEO': client.get_klines(symbol='NEOBTC', interval=Client.KLINE_INTERVAL_4HOUR, limit = 100)
+    }
+    '''
+    formatted = {}
+
+    for c in candles:
+        formatted[c] = {'date': [], 'close':[], 'open':[], 'high':[],'low':[], 'volume':[], 'price_usd': []}
+
+    for c in candles:
+        date, closep, highp, lowp, openp, volume, gmt_time, ts_format = [], [], [], [], [], [], [], []
+        for d in candles[c]:
+        #timestamp = time.strftime("%a %d %b %Y %H:%M:%S GMT", time.gmtime(candle[0] / 1000.0))
+            dt_ts = datetime.fromtimestamp(int(d[0]) / 1e3 )
+            formatted[c]['date'].append(mdates.date2num(dt_ts))
+            timestamp = time.strftime("%b %d %H:%M", time.gmtime(d[0] / 1000.0))
+            gmt_time.append(timestamp)
+            date.append(int(d[0]))
+            formatted[c]['open'].append(float(d[1]))
+            formatted[c]['high'].append(float(d[2]))
+            formatted[c]['low'].append(float(d[3]))
+            formatted[c]['close'].append(float(d[4]))
+            formatted[c]['volume'].append(float(d[5]))
+
+    for f in formatted:
+        priceIndex = 0
+        if(f == 'BTC'):
+            formatted[f]['price_usd'] = formatted[f]['close']
+        else:
+            for coin in formatted[f]['close']:
+                formatted[f]['price_usd'].append(coin * formatted['BTC']['close'][priceIndex])
+                priceIndex+=1
+
+    df_list = {}
+    prices = {}
+
+    for f in formatted:
+        df_list[f] = pd.DataFrame.from_dict(formatted[f])
+        prices[f] = formatted[f]['price_usd']
+
+    df_prices = pd.DataFrame(data=prices)
+    corrMat = df_prices.pct_change().corr(method='pearson')
+
+    print(corrMat)
+    sns.heatmap(corrMat, square=True)
+    plt.yticks(rotation=0)
+    plt.xticks(rotation=90)
+    #plt.title("Cryptocurrency Correlation Heatmap")
+
+    directory = '../../../light-bootstrap-dashboard-react-master/src/assets/img/'
+    try:
+        os.makedirs(directory)
+    except OSError as e:
+        if e.errno != errno.EEXIST:
+            raise
+
+    plt.savefig(directory + 'graph.png', bbox_inches='tight')
+    print(f"Image saved to {directory + 'graph.png'}")
+    #plt.show()
+
+    '''
+    candles1 = client.get_klines(symbol='BTCUSDT', interval=Client.KLINE_INTERVAL_30MINUTE, limit=100)
+    candles2 = client.get_klines(symbol='ETHBTC', interval=Client.KLINE_INTERVAL_30MINUTE, limit = 100)
+    candles3 = client.get_klines(symbol='XRPBTC', interval=Client.KLINE_INTERVAL_30MINUTE, limit = 100)
+    candles4 = client.get_klines(symbol='BCCBTC', interval=Client.KLINE_INTERVAL_30MINUTE, limit = 100)
+    candles5 = client.get_klines(symbol='EOSBTC', interval=Client.KLINE_INTERVAL_30MINUTE, limit = 100)
+    
     #print(candles2)
     #print(candles)
     date, closep, highp, lowp, openp, volume = [], [], [], [], [], []
     gmt_time = []
     ts_format = []
 
+    
     for candle in candles:
         #timestamp = time.strftime("%a %d %b %Y %H:%M:%S GMT", time.gmtime(candle[0] / 1000.0))
         dt_ts = datetime.fromtimestamp(int(candle[0]) / 1e3 )
@@ -179,6 +438,7 @@ def printKlines(pair):
         lowp.append(float(candle[3]))
         closep.append(float(candle[4]))
         volume.append(float(candle[5]))
+    
 
     x = 0
     y = len(date)
@@ -226,14 +486,16 @@ def printKlines(pair):
         'volume': np.array(volume2)
     }
 
-
+    
     output = SMA(inputs, timeperiod=25)
     slowk, slowd = STOCH(inputs, 5, 3, 0, 3, 0)
     real = RSI(inputs, timeperiod=7)
+    
 
     macd, macdsignal, macdhist = MACD(inputs, fastperiod=12, slowperiod=26, signalperiod=9)
     #print(real)
-
+    '''
+    '''
     ax1 = plt.subplot2grid((6,1), (0,2))
     plt.xticks(rotation=25)
     plt.margins(0)
@@ -246,6 +508,8 @@ def printKlines(pair):
     
     ax1.scatter(closep, closep2)
     print(f'PearsonR: {scipy.stats.pearsonr(closep2, closep)}')
+    '''
+
     '''
     candlestick_ohlc(ax1, ohlc, width=0.1, colorup='#77d879', colordown='#db3f3f')
     #candlestick_ohlc_black(ax1, ohlc, width=1)
@@ -272,8 +536,9 @@ def printKlines(pair):
     ax3.plot(ts_format, real)
     ax3.xaxis.set_major_formatter(xfmt)
     ax3.set_title('RSI')
-    '''
+    
     plt.show()
+    '''
 
     
 def main(argv):
@@ -291,9 +556,10 @@ def main(argv):
     predictPair = ''
     backtestParams = ''
     jsParams = ''
+    analyzeParams = ''
 
     try:
-        opts, args = getopt.getopt(argv,"efwlhp:c:k:m:t:b:s:x:a:r:j:",["period=", "asset=", "klines=", "model=", "test=", "buy=", "sell=", "cancel=", "predict=", "btest=", "js="])
+        opts, args = getopt.getopt(argv,"efwlhp:c:k:m:t:b:s:x:a:r:j:d:",["period=", "asset=", "klines=", "model=", "test=", "buy=", "sell=", "cancel=", "predict=", "btest=", "js=", "analyze="])
     except getopt.GetoptError:
         help()
         sys.exit(2)
@@ -334,9 +600,14 @@ def main(argv):
             backtestParams = arg
         elif opt in ("-j", "--js"):
             jsParams = arg
+        elif opt in ("-d", "--analyze"):
+            analyzeParams = arg
             
 
     while True:
+        if(analyzeParams):
+            analyzePair(analyzeParams)
+
         if(jsParams):
             returnCandles(jsParams)
 
@@ -363,8 +634,7 @@ def main(argv):
             t0 = time.time()
             if(testSymbol == 'ALL') or (testSymbol == 'all'):
                 filename1 = datetime.now().strftime("%Y%m%d-%H%M%S")
-                #open('output.txt', 'w').close()
-                sys.stdout = open(f'output/{filename1}.txt', 'w')
+                #sys.stdout = open(f'output/{filename1}.txt', 'w')
 
                 print(datetime.now())
                 prices = client.get_all_tickers()
@@ -393,6 +663,31 @@ def main(argv):
                         if(t['macd'] <= t['macdsignal']):
                             if(t['price'] <= t['middleband']):
                                 test.printOutputs(t)
+
+                #sys.stdout.close()
+                #sys.stdout = sys.__stdout__
+                print(f'Results displayed in output/{filename1}.txt')
+            elif(testSymbol == 'ALL2') or (testSymbol == 'all2'):
+                filename1 = datetime.now().strftime("%Y%m%d-%H%M%S")
+                #open('output.txt', 'w').close()
+                sys.stdout = open(f'output/{filename1}.txt', 'w')
+
+                print(datetime.now())
+                prices = client.get_all_tickers()
+                marketsymbols = []
+                ta = []
+                for symbol in prices:
+                    if symbol['symbol'][-3:] == 'BTC':
+                        marketsymbols.append(symbol['symbol'])
+        
+                for symbol in marketsymbols:
+                    ta.append(test.testMethod(client, symbol, True))
+
+                ta = list(filter(None.__ne__, ta))
+                print("RSI lower than 30")
+                for t in ta:
+                    if(t['rsi'] <= 30):
+                        test.printOutputs(t)
 
                 sys.stdout.close()
                 sys.stdout = sys.__stdout__

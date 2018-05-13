@@ -18,6 +18,7 @@
 #center {
 	display:block;
 	margin: auto;
+	text-align: center;
 }
 
 .login-google-img {
@@ -52,6 +53,8 @@
 	min-height: auto !important;
 }
 
+
+
 .loader{
 	position:absolute;
 	top: 50px;
@@ -59,4 +62,45 @@
 	margin-left:auto;
 	left:0;
 	right:0;
+}
+
+#sidebar > div.sidebar-wrapper > div > div.content {
+	min-height: auto !important;
+	padding: inherit !important;
+}
+
+#sidebar > div.sidebar-wrapper > div {
+	border-radius: 0px !important;
+}
+
+#collapsible-panel{
+	margin-bottom: 0px;
+}
+
+#price-text{
+	margin: 0px;
+	font-weight: 400;
+}
+
+.icon-big-pair{
+	font-size: 2em;
+	min-height: 64px;
+}
+
+.bold{
+	font-weight: bold !important;
+	line-height: 59px !important;
+}
+
+.time-frame{
+	font-size: 14px;
+}
+
+img {
+    max-width: 100%;
+    max-height: 100%;
+}
+
+.analyze-coin{
+	margin-top:22px;
 }

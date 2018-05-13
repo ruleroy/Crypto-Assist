@@ -1,9 +1,11 @@
 import React, { Component } from 'react';
 import ChartistGraph from 'react-chartist';
-import { Grid, Row, Col } from 'react-bootstrap';
+import { Grid, Row, Col, Panel} from 'react-bootstrap';
 
 import {UserCard} from 'components/UserCard/UserCard.jsx';
 import Button from 'elements/CustomButton/CustomButton.jsx';
+
+import {LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts'
 
 import avatar from "assets/img/faces/face-0.jpg";
 import {Card} from 'components/Card/Card.jsx';
@@ -29,7 +31,9 @@ class Dashboard extends Component {
         super(props);
         this.getBinanceData = this.getBinanceData.bind(this);
         this.getBinanceAccData = this.getBinanceAccData.bind(this);
+        this.getChartData = this.getChartData.bind(this);
         this.state = {
+            open: false,
             status: 'Updating...',
             loadedAcc: false,
             loadedGraph: false,
@@ -38,6 +42,7 @@ class Dashboard extends Component {
             pic: '',
             pair: 'BTCUSDT',
             data: {},
+            data2: [],
             btc_bal: '-',
             total_btc_val: '-',
             total_usd_val: '-',
@@ -86,6 +91,28 @@ class Dashboard extends Component {
     });
 }
 
+getChartData(){
+    var that = this;
+    var getData = new Request('http://localhost:3001/api/get-data2?pair=' + this.state.pair, {
+        method: 'GET'
+    });
+
+    fetch(getData)
+    .then(function(response){
+        if(response.status === 200){
+            response.json()
+            .then(function(data){
+                that.setState({
+                    loadedGraph: true,
+                    data2: data
+                });
+            });
+        } else if(response.status === 400) {
+            alert('error');
+        }
+    });
+}
+
 getBinanceAccData(){
     var that = this;
     var getAccData = new Request('http://localhost:3001/api/get-acc', {
@@ -123,7 +150,8 @@ componentDidMount(){
         pic: data.provider_pic
     });
     this.getBinanceAccData();
-    this.getBinanceData();
+    //this.getBinanceData();
+    this.getChartData();
 }
 
 createLegend(json){
@@ -145,7 +173,10 @@ render() {
         <div className="content">
         <Grid fluid>
         <Row>
+        {
+            /*
         <Col lg={3} sm={6}>
+
         <UserCard
         bgImage="https://ununsplash.imgix.net/photo-1431578500526-4d9613015464?fit=crop&fm=jpg&h=300&q=75&w=400"
         avatar={this.state.pic}
@@ -153,82 +184,97 @@ render() {
         userName={this.state.username}
         />
         </Col>
-        <Col lg={3} sm={6}>
-        
-        <StatsCard
-        bigIcon={<i className="pe-7s-server text-warning"></i>}
-        statsText="BTC Balance"
-        statsValue={<Loader loaded={this.state.loadedAcc}>{this.state.btc_bal}</Loader>}
-        statsIcon={<i className="fa fa-refresh"></i>}
-        statsIconText={this.state.status}
-        />
-        
-        </Col>
-        <Col lg={3} sm={6}>
+        */
+    }
+    <Col lg={4} sm={6}>
 
-        <StatsCard
-        bigIcon={<i className="pe-7s-wallet text-danger"></i>}
-        statsText="Portfolio Value (BTC)"
-        statsValue={<Loader loaded={this.state.loadedAcc}>{this.state.total_btc_val}</Loader>}
-        statsIcon={<i className="fa fa-refresh"></i>}
-        statsIconText={this.state.status}
-        />
-        
-        </Col>
-        <Col lg={3} sm={6}>
-        
-        <StatsCard
-        bigIcon={<i className="pe-7s-cash text-success"></i>}
-        statsText="Portfolio Value (USD)"
-        statsValue={<Loader loaded={this.state.loadedAcc}>{"$" + this.state.total_usd_val}</Loader>}
-        statsIcon={<i className="fa fa-refresh"></i>}
-        statsIconText={this.state.status}
-        />
-        
-        </Col>
-        </Row>
+    <StatsCard
+    bigIcon={<i className="pe-7s-server text-warning"></i>}
+    statsText="BTC Balance"
+    statsValue={<Loader loaded={this.state.loadedAcc}>{this.state.btc_bal}</Loader>}
+    statsIcon={<i className="fa fa-refresh"></i>}
+    statsIconText={this.state.status}
+    />
+
+    </Col>
+    <Col lg={4} sm={6}>
+
+    <StatsCard
+    bigIcon={<i className="pe-7s-wallet text-danger"></i>}
+    statsText="Portfolio Value (BTC)"
+    statsValue={<Loader loaded={this.state.loadedAcc}>{this.state.total_btc_val}</Loader>}
+    statsIcon={<i className="fa fa-refresh"></i>}
+    statsIconText={this.state.status}
+    />
+
+    </Col>
+    <Col lg={4} sm={6}>
+
+    <StatsCard
+    bigIcon={<i className="pe-7s-cash text-success"></i>}
+    statsText="Portfolio Value (USD)"
+    statsValue={<Loader loaded={this.state.loadedAcc}>{"$" + this.state.total_usd_val}</Loader>}
+    statsIcon={<i className="fa fa-refresh"></i>}
+    statsIconText={this.state.status}
+    />
+
+    </Col>
+    </Row>
+    <Row>
+    <Col md={12}>
+    
+    <Card
+    statsIcon="fa fa-history"
+    id="chartHours"
+    title=
+    {
+        <div>
         <Row>
-        <Col md={12}>
-        <Card
-        statsIcon="fa fa-history"
-        id="chartHours"
-        title="BTC / USDT"
-        category="Binance - 4 HOUR Time period"
-        stats={this.state.status}
-        content={
-            <div>
-            <Row>
-            <Loader loaded={this.state.loadedGraph}>
-            <ChartistGraph
-            data={this.state.data}
-            type="Line"
-            options={this.state.optionsSales}
-            responsiveOptions={responsiveSales}
-            />
-            </Loader>
-            </Row>
-            <Row>
-            <Col md={3}>
-            
-            <StatsCard
-            bigIcon={<i className="pe-7s-cash text-success"></i>}
-            statsText="Last Price"
-            statsValue={<Loader loaded={this.state.loadedAcc}>{"$" + this.state.btc_price}</Loader>}
-            />
-            
-            </Col>
-            </Row>
-            </div>
-        }
-
-        />
+        <Col xs={1}>
+        <div className="icon-big-pair text-center">
+        <i className="pe-7s-cash text-success bold"></i>
+        </div>
+        </Col>
+        
+        <Col xs={11}>
+        <p>BTC / USDT</p>
+        <h2 id="price-text"><Loader loaded={this.state.loadedAcc}>{"$" + this.state.btc_price}</Loader></h2>
         </Col>
         </Row>
-
-
-        </Grid>
         </div>
-        );
+    }
+    category={<span className="time-frame text-center">Binance - 4 Hour Time Frame</span>}
+    stats={this.state.status}
+    content=
+    {
+        <div>
+
+
+        <Row>
+        <ResponsiveContainer width="97%" height="30%">
+        <LineChart data={this.state.data2}
+        margin={{top: 5, right: 30, left: 20, bottom: 20}}>
+        <XAxis dataKey="date"/>
+        <YAxis type="number" domain={['auto', 'auto']} />
+        <CartesianGrid strokeDasharray="3 3"/>
+        <Tooltip/>
+        <Line type="linear" dataKey="price" stroke="#8884d8" activeDot={{r: 8}}/>
+        </LineChart>
+        </ResponsiveContainer>
+        </Row>
+
+        </div>
+    }
+
+    />
+    </Col>
+
+    </Row>
+
+
+    </Grid>
+    </div>
+    );
 }
 }
 

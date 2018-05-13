@@ -1,5 +1,6 @@
 import React, {Component} from 'react';
 import { NavItem, Nav, NavDropdown, MenuItem } from 'react-bootstrap';
+import { LinkContainer  } from 'react-router-bootstrap';
 import {
     Route,
     Switch,
@@ -14,7 +15,7 @@ class HeaderLinks extends Component{
     }
 
 
-  handleSelect(eventKey) {
+    handleSelect(eventKey) {
     //alert(`selected ${eventKey}`);
     if(eventKey == 3){
         this.logout();
@@ -40,7 +41,6 @@ render(){
         <div>
 
         <Nav pullRight>
-        <NavItem eventKey={1} href="#">Account</NavItem>
 
         <NavItem eventKey={3} href="#" onSelect={this.handleSelect.bind(this)}>Log out</NavItem>
         </Nav>

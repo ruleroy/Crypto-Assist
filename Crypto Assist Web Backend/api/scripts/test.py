@@ -109,84 +109,9 @@ def testMethod(client, pair, filter):
         'lowerband': '{0:.8f}'.format(lowerband[-1]),
         'rsi': rsi[-1]
     }
+    print(output)
     return output
 
-    #print(depth)
-    '''
-    print('\nBids')
-    for d in depth['bids']:
-        print(f'Price: {d[0]}   Quantity: {d[1]}')
-
-    print('\nAsks')
-    for d in depth['asks']:
-        print(f'Price: {d[0]}   Quantity: {d[1]}')
-    '''
-    
-
-
-    '''
-    stochResults = []
-    i = 0
-    for n in real[15:]:
-        if i == 0:
-            inputs2 = {
-                'high': [],
-                'low': [],
-                'close': np.array(closep)
-            }
-        else:
-            inputs2 = {
-                'high': [],
-                'low': [],
-                'close': np.array(closep[:-i])
-            }
-
-        rsi = RSI(inputs2, timeperiod=14)
-
-        highest = max(rsi[15:])
-        lowest = min(rsi[15:])
-        stochrsi = 100 * ((rsi[-1] - lowest) / (highest - lowest))
-        stochResults.append(stochrsi)
-        print(stochrsi)
-        i = i + 1
-        print(i)
-    
-    print(stochResults)
-
-    stoch = {
-        'close': np.array(stochResults),
-        'high': [],
-        'low': []
-    }
-
-    fastk = SMA(stoch, timeperiod=3)
-
-    stoch2 = {
-        'close': np.array(fastk),
-        'high': [],
-        'low': []
-    }
-    fastd = SMA(stoch2, timeperiod=3)
-
-    print(fastk)
-    '''
-
-
-
-    '''
-    ax1 = plt.subplot2grid((6,1), (0,2))
-    plt.xticks(rotation=25)
-    plt.margins(0)
-    ax2 = plt.subplot2grid((6,1), (3, 0))
-    plt.xticks(rotation=25)
-    plt.margins(0)
-
-    ax1.plot(ts_format, inputs['close'])
-
-    ax2.plot(slowk, color='blue')
-    ax2.plot(slowd, color='orange')
-    plt.show()
-    '''
 def printOutputs(ta):
 
     print(f"\n{ta['symbol']}")

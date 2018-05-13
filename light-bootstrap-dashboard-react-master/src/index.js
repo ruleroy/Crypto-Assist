@@ -4,7 +4,8 @@ import ReactDOM from 'react-dom';
 import {
 	HashRouter,
 	Route,
-	Switch
+	Switch,
+	BrowserRouter
 } from 'react-router-dom';
 
 import App from 'containers/App/App.jsx';
@@ -20,10 +21,10 @@ import './assets/css/pe-icon-7-stroke.css';
 
 
 ReactDOM.render((
-	<HashRouter>
+	<BrowserRouter>
 	<Switch>
 	<Route exact path="/" name="Login" component={Login}/>
 	<Route path="/" name="Dashboard" component={App}/>
 	</Switch>
-	</HashRouter>
+	</BrowserRouter>
 	),document.getElementById('root'));
