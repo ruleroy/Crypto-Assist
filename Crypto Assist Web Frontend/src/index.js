@@ -1,23 +1,30 @@
 import React from 'react';
 import ReactDOM from 'react-dom';
-import './index.css';
-import App from './App';
-import Dashboard from './dashboard/Dashboard'
-import registerServiceWorker from './registerServiceWorker';
-import { Route, BrowserRouter, Switch } from 'react-router-dom';
-import { Provider } from 'react-redux';
+
+import {
+	HashRouter,
+	Route,
+	Switch,
+	BrowserRouter
+} from 'react-router-dom';
+
+import App from 'containers/App/App.jsx';
+import Login from 'containers/App/Login.jsx';
+
+import './assets/css/bootstrap.min.css';
+import './assets/css/animate.min.css';
+import './assets/sass/light-bootstrap-dashboard.css';
+import './assets/css/demo.css';
+import './assets/css/pe-icon-7-stroke.css';
 
 
 
-ReactDOM.render(
 
+ReactDOM.render((
 	<BrowserRouter>
-		<Switch>
-		<Route exact path="/" component={App} />
-		<Route path="/dashboard" component={Dashboard} />
-		</Switch>
+	<Switch>
+	<Route exact path="/" name="Login" component={Login}/>
+	<Route path="/" name="Dashboard" component={App}/>
+	</Switch>
 	</BrowserRouter>
-
-
-	, document.getElementById('root'));
-registerServiceWorker();
+	),document.getElementById('root'));
